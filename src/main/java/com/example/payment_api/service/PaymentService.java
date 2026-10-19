@@ -1,72 +1,41 @@
-
 package com.example.payment_api.service;
 
-import com.example.payment_api.config.PaymentProperties;
+import java.util.List;
+
 import com.example.payment_api.dto.PaymentRequest;
 import com.example.payment_api.dto.PaymentResponse;
-import com.example.payment_api.exception.PaymentNotFoundException;
-import com.example.payment_api.model.Payment;
-import org.springframework.stereotype.Service;
 
-import java.time.Instant;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+public interface PaymentService {
 
-@Service
-public class PaymentService {
+    /**
+     * Creates a payment, or returns the existing one if this idempotency key was already used
+     * with the same request.
+     *
+     * @throws com.example.payment_api.exception.InvalidIdempotencyKeyException if the key is blank or too long
+     * @throws com.example.payment_api.exception.IdempotencyKeyMismatchException if the key was used with a different request
+     * @throws com.example.payment_api.exception.IdempotencyKeyConflictException if another request with the key is in progress
+     */
+    PaymentResponse createPayment(PaymentRequest request, String idempotencyKey);
 
-    private final PaymentProperties paymentProperties;
+    /**
+     * @throws com.example.payment_api.exception.PaymentNotFoundException if the payment doesn't exist or was deleted
+     */
+    PaymentResponse getPayment(Long id);
 
-    public PaymentService(PaymentProperties paymentProperties) {
-        this.paymentProperties = paymentProperties;
-    }
+    /**
+     * Replaces the payment's accounts, amount and currency. Status and creation time are kept.
+     *
+     * @throws com.example.payment_api.exception.PaymentNotFoundException if the payment doesn't exist or was deleted
+     */
+    PaymentResponse updatePayment(Long id, PaymentRequest request);
 
-    private final ConcurrentHashMap<Long, Payment> payments =
-            new ConcurrentHashMap<>();
+    /**
+     * Soft-deletes the payment: the row is kept and flagged as deleted.
+     *
+     * @throws com.example.payment_api.exception.PaymentNotFoundException if the payment doesn't exist or was already deleted
+     */
+    void deletePayment(Long id);
 
-    private final AtomicLong idGenerator = new AtomicLong(0);
-
-    public PaymentResponse createPayment(PaymentRequest request) {
-        long id = idGenerator.incrementAndGet();
-
-        Payment payment = new Payment(
-                id,
-                request.sourceAccount(),
-                request.destinationAccount(),
-                request.amount(),
-                request.currency(),
-                paymentProperties.defaultStatus(),
-                Instant.now()
-        );
-
-        payments.put(id, payment);
-
-        return new PaymentResponse(
-                payment.id(),
-                payment.sourceAccount(),
-                payment.destinationAccount(),
-                payment.amount(),
-                payment.currency(),
-                payment.status(),
-                payment.createdAt()
-        );
-    }
-
-    public PaymentResponse getPayment(Long id) {
-        Payment payment = payments.get(id);
-
-        if (payment == null) {
-            throw new PaymentNotFoundException(id);
-        }
-
-        return new PaymentResponse(
-                payment.id(),
-                payment.sourceAccount(),
-                payment.destinationAccount(),
-                payment.amount(),
-                payment.currency(),
-                payment.status(),
-                payment.createdAt()
-        );
-    }
+    /** Returns all payments that haven't been deleted, oldest first. */
+    List<PaymentResponse> getAllPayments();
 }
