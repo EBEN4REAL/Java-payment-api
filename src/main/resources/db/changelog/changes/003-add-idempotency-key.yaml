@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-add-idempotency-key
+      author: payment-api
+      changes:
+        - addColumn:
+            tableName: payments
+            columns:
+              - column:
+                  name: idempotency_key
+                  type: VARCHAR(100)
+
+              # SHA-256 of the original request, used to reject reuse of a key with a different body.
+              - column:
+                  name: idempotency_request_hash
+                  type: CHAR(64)
+
+        - addUniqueConstraint:
+            tableName: payments
+            columnNames: idempotency_key
+            constraintName: uk_payments_idempotency_key
