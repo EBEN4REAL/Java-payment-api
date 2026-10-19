@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-create-payments-table.yaml
+  - include:
+      file: db/changelog/changes/002-add-is-deleted-to-payments.yaml
+  - include:
+      file: db/changelog/changes/003-add-idempotency-key.yaml
+  - include:
+      file: db/changelog/changes/004-create-users-table.yaml
+  - include:
+      file: db/changelog/changes/005-create-refresh-tokens-table.yaml
+  - include:
+      file: db/changelog/changes/006-create-roles-and-user-roles.yaml
