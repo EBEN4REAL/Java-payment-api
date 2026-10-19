@@ -8,5 +8,70 @@
     "name": "payment.default-status",
     "type": "java.lang.String",
     "description": "A description for 'payment.default-status'"
+  },
+  {
+    "name": "spring.cache.type",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.cache.type'"
+  },
+  {
+    "name": "spring.cache.redis.time-to-live",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.cache.redis.time-to-live'"
+  },
+  {
+    "name": "spring.liquibase.enabled",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.liquibase.enabled'"
+  },
+  {
+    "name": "spring.liquibase.change-log",
+    "type": "java.lang.String",
+    "description": "A description for 'spring.liquibase.change-log'"
+  },
+  {
+    "name": "security.jwt.secret",
+    "type": "java.lang.String",
+    "description": "A description for 'security.jwt.secret'"
+  },
+  {
+    "name": "security.jwt.secret",
+    "type": "java.lang.String",
+    "description": "A description for 'security.jwt.secret'"
+  },
+  {
+    "name": "security.jwt.issuer",
+    "type": "java.lang.String",
+    "description": "A description for 'security.jwt.issuer'"
+  },
+  {
+    "name": "security.jwt.access-token-ttl",
+    "type": "java.lang.String",
+    "description": "A description for 'security.jwt.access-token-ttl'"
+  },
+  {
+    "name": "security.jwt.refresh-token-ttl",
+    "type": "java.lang.String",
+    "description": "A description for 'security.jwt.refresh-token-ttl'"
+  },
+  {
+    "name": "security.refresh-cookie.name",
+    "type": "java.lang.String",
+    "description": "A description for 'security.refresh-cookie.name'"
+  },
+  {
+    "name": "security.refresh-cookie.path",
+    "type": "java.lang.String",
+    "description": "A description for 'security.refresh-cookie.path'"
+  },
+  {
+    "name": "security.refresh-cookie.secure",
+    "type": "java.lang.String",
+    "description": "A description for 'security.refresh-cookie.secure'"
+  },
+  {
+    "name": "security.refresh-cookie.same-site",
+    "type": "java.lang.String",
+    "description": "A description for 'security.refresh-cookie.same-site'"
   }
 ]}
