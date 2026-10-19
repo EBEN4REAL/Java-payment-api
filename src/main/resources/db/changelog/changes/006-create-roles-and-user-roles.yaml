@@ -1,0 +1,129 @@
+# Moves roles from the users.role column into a roles table and a user_roles
+# join table, so a user can have several roles.
+# Split into separate changesets because MySQL can't roll back DDL inside a
+# transaction: each step is recorded on its own and has its own rollback.
+databaseChangeLog:
+  - changeSet:
+      id: 006-1-create-roles-table
+      author: payment-api
+      changes:
+        - createTable:
+            tableName: roles
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_roles
+                    nullable: false
+
+              - column:
+                  name: name
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_roles_name
+
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: name
+                  value: USER
+
+        - insert:
+            tableName: roles
+            columns:
+              - column:
+                  name: name
+                  value: ADMIN
+      rollback:
+        - dropTable:
+            tableName: roles
+
+  - changeSet:
+      id: 006-2-create-user-roles-table
+      author: payment-api
+      changes:
+        - createTable:
+            tableName: user_roles
+            columns:
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_user_roles_user
+                    references: users(id)
+                    deleteCascade: true
+
+              - column:
+                  name: role_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_user_roles_role
+                    references: roles(id)
+
+        # A user can hold each role at most once.
+        - addPrimaryKey:
+            tableName: user_roles
+            columnNames: user_id, role_id
+            constraintName: pk_user_roles
+
+  - changeSet:
+      id: 006-3-copy-existing-user-roles
+      author: payment-api
+      changes:
+        - sql:
+            sql: >
+              INSERT INTO user_roles (user_id, role_id)
+              SELECT u.id, r.id
+              FROM users u
+              JOIN roles r ON r.name = u.role
+      rollback:
+        - sql:
+            sql: DELETE FROM user_roles
+
+  - changeSet:
+      id: 006-4-drop-users-role-column
+      author: payment-api
+      # Only drop the old column once every user has a role in user_roles.
+      # If not, stop the migration rather than lose data.
+      preConditions:
+        - onFail: HALT
+        - onFailMessage: Some users have no row in user_roles. Not dropping users.role.
+        - sqlCheck:
+            expectedResult: 0
+            sql: >
+              SELECT COUNT(*) FROM users u
+              WHERE NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id)
+      changes:
+        - dropColumn:
+            tableName: users
+            columnName: role
+      rollback:
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: role
+                  type: VARCHAR(20)
+        # Restore one role per user, preferring ADMIN.
+        - sql:
+            sql: >
+              UPDATE users u
+              SET u.role = (
+                SELECT r.name FROM user_roles ur
+                JOIN roles r ON r.id = ur.role_id
+                WHERE ur.user_id = u.id
+                ORDER BY r.name = 'ADMIN' DESC
+                LIMIT 1
+              )
+        - addNotNullConstraint:
+            tableName: users
+            columnName: role
+            columnDataType: VARCHAR(20)
