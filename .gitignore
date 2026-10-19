@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Local secrets (never commit) ###
+# Config files hold secrets: copy application.properties.example to create them.
+src/main/resources/application*.properties
+src/test/resources/application*.properties
+.env
+.env.*

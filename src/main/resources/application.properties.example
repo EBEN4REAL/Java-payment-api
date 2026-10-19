@@ -1,0 +1,41 @@
+# Template for src/main/resources/application.properties, which is not committed.
+# Copy this file to application.properties and fill in the empty values.
+
+spring.application.name=payment-api
+
+server.port=8080
+
+payment.currency=NGN
+payment.default-status=PENDING
+
+spring.data.redis.host=localhost
+spring.data.redis.port=6379
+
+spring.cache.type=redis
+spring.cache.redis.time-to-live=60s
+
+# JWT authentication. The secret must be random and at least 32 bytes.
+# Generate one with: openssl rand -base64 48
+security.jwt.secret=
+security.jwt.issuer=payment-api
+security.jwt.access-token-ttl=15m
+security.jwt.refresh-token-ttl=7d
+
+# Refresh token cookie. Path limits it to the auth endpoints.
+# Secure stays true: browsers allow Secure cookies on http://localhost.
+security.refresh-cookie.name=refresh_token
+security.refresh-cookie.path=/api/auth
+security.refresh-cookie.secure=true
+security.refresh-cookie.same-site=Strict
+
+spring.datasource.url=jdbc:mysql://localhost:3306/payment_db
+spring.datasource.username=
+spring.datasource.password=
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+
+# Liquibase migrations
+spring.liquibase.enabled=true
+spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml
