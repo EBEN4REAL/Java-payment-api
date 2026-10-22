@@ -87,7 +87,6 @@ class ConstraintViolationsIntegrationTest {
                 "0987654321",
                 amount,
                 "NGN",
-                "PENDING",
                 idempotencyKey,
                 "0".repeat(64)
         );
