@@ -1,9 +1,9 @@
 package com.example.payment_api.service;
 
-import java.util.List;
-
+import com.example.payment_api.dto.PageResponse;
 import com.example.payment_api.dto.PaymentRequest;
 import com.example.payment_api.dto.PaymentResponse;
+import com.example.payment_api.enums.PaymentStatus;
 
 public interface PaymentService {
 
@@ -36,6 +36,12 @@ public interface PaymentService {
      */
     void deletePayment(Long id);
 
-    /** Returns all payments that haven't been deleted, oldest first. */
-    List<PaymentResponse> getAllPayments();
+    /**
+     * Returns one page of payments that haven't been deleted, newest first.
+     *
+     * @param status only return payments with this status, or {@code null} for all statuses
+     * @param page zero-based page number
+     * @param size page size, at least 1
+     */
+    PageResponse<PaymentResponse> listPayments(PaymentStatus status, int page, int size);
 }
