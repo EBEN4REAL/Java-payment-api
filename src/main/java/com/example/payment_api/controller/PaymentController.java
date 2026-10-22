@@ -1,17 +1,22 @@
 
 package com.example.payment_api.controller;
 
+import com.example.payment_api.dto.PageResponse;
 import com.example.payment_api.dto.PaymentRequest;
 import com.example.payment_api.dto.PaymentResponse;
+import com.example.payment_api.enums.PaymentStatus;
 import com.example.payment_api.service.PaymentService;
 import jakarta.validation.Valid;
-import java.util.List;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/payments")
 public class PaymentController {
+
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final PaymentService paymentService;
 
@@ -27,9 +32,13 @@ public class PaymentController {
         return paymentService.createPayment(request, idempotencyKey);
     }
 
+    // Example: GET /api/payments?status=PENDING&page=0&size=20
     @GetMapping
-    public List<PaymentResponse> getAllPayments() {
-        return paymentService.getAllPayments();
+    public PageResponse<PaymentResponse> listPayments(
+            @RequestParam(required = false) PaymentStatus status,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(MAX_PAGE_SIZE) int size) {
+        return paymentService.listPayments(status, page, size);
     }
 
     @GetMapping("/{id}")
