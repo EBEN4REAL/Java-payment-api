@@ -8,8 +8,12 @@ import java.time.temporal.ChronoUnit;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.example.payment_api.enums.PaymentStatus;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -34,8 +38,9 @@ public class Payment {
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private String status;
+    private PaymentStatus status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -58,7 +63,6 @@ public class Payment {
             String destinationAccount,
             BigDecimal amount,
             String currency,
-            String status,
             String idempotencyKey,
             String idempotencyRequestHash) {
         this.idempotencyKey = idempotencyKey;
@@ -67,7 +71,7 @@ public class Payment {
         this.destinationAccount = destinationAccount;
         this.amount = amount;
         this.currency = currency;
-        this.status = status;
+        this.status = PaymentStatus.PENDING;
         // MySQL TIMESTAMP stores whole seconds, so truncate to match what GET returns.
         this.createdAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
     }
@@ -119,7 +123,7 @@ public class Payment {
         return currency;
     }
 
-    public String getStatus() {
+    public PaymentStatus getStatus() {
         return status;
     }
 
