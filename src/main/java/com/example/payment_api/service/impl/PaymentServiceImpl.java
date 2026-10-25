@@ -3,17 +3,20 @@ package com.example.payment_api.service.impl;
 
 import com.example.payment_api.service.PaymentService;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.payment_api.config.PaymentProperties;
+import com.example.payment_api.dto.PageResponse;
 import com.example.payment_api.dto.PaymentRequest;
 import com.example.payment_api.dto.PaymentResponse;
 import com.example.payment_api.exception.IdempotencyKeyConflictException;
@@ -21,6 +24,7 @@ import com.example.payment_api.exception.IdempotencyKeyMismatchException;
 import com.example.payment_api.exception.InvalidIdempotencyKeyException;
 import com.example.payment_api.exception.PaymentNotFoundException;
 import com.example.payment_api.entity.Payment;
+import com.example.payment_api.enums.PaymentStatus;
 import com.example.payment_api.repository.PaymentRepository;
 import com.example.payment_api.util.ConstraintViolations;
 import com.example.payment_api.util.Hashing;
@@ -28,18 +32,16 @@ import com.example.payment_api.util.Hashing;
 @Service
 public class PaymentServiceImpl implements PaymentService {
 
-    private final PaymentProperties paymentProperties;
     private final PaymentRepository paymentRepository;
 
-    public PaymentServiceImpl(
-            PaymentProperties paymentProperties,
-            PaymentRepository paymentRepository) {
-        this.paymentProperties = paymentProperties;
+    public PaymentServiceImpl(PaymentRepository paymentRepository) {
         this.paymentRepository = paymentRepository;
     }
 
     private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 100;
     private static final String IDEMPOTENCY_KEY_CONSTRAINT = "uk_payments_idempotency_key";
+    // Newest first. Both list indexes end in id, so MySQL reads a page in index order.
+    private static final Sort LIST_SORT = Sort.by(Sort.Direction.DESC, "id");
 
     @Transactional
     @Override
@@ -66,7 +68,6 @@ public class PaymentServiceImpl implements PaymentService {
                 request.destinationAccount(),
                 request.amount(),
                 request.currency(),
-                paymentProperties.defaultStatus(),
                 idempotencyKey,
                 requestHash
         );
@@ -128,11 +129,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<PaymentResponse> getAllPayments() {
-        return paymentRepository.findAllByDeletedFalseOrderByIdAsc()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public PageResponse<PaymentResponse> listPayments(PaymentStatus status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, LIST_SORT);
+
+        Page<Payment> payments = status == null
+                ? paymentRepository.findAllByDeletedFalse(pageable)
+                : paymentRepository.findAllByDeletedFalseAndStatus(status, pageable);
+
+        return PageResponse.from(payments, this::toResponse);
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {
