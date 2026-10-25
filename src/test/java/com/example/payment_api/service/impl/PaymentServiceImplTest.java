@@ -1,10 +1,11 @@
 
 package com.example.payment_api.service.impl;
 
-import com.example.payment_api.config.PaymentProperties;
+import com.example.payment_api.dto.PageResponse;
 import com.example.payment_api.dto.PaymentRequest;
 import com.example.payment_api.dto.PaymentResponse;
 import com.example.payment_api.entity.Payment;
+import com.example.payment_api.enums.PaymentStatus;
 import com.example.payment_api.exception.IdempotencyKeyConflictException;
 import com.example.payment_api.exception.IdempotencyKeyMismatchException;
 import com.example.payment_api.exception.InvalidIdempotencyKeyException;
@@ -19,6 +20,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -44,10 +50,7 @@ class PaymentServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        PaymentProperties properties =
-                new PaymentProperties("NGN", "PENDING");
-
-        paymentService = new PaymentServiceImpl(properties, paymentRepository);
+        paymentService = new PaymentServiceImpl(paymentRepository);
     }
 
     @Test
@@ -78,12 +81,12 @@ class PaymentServiceImplTest {
         assertEquals("0987654321", response.destinationAccount());
         assertEquals(new BigDecimal("5000.00"), response.amount());
         assertEquals("NGN", response.currency());
-        assertEquals("PENDING", response.status());
+        assertEquals(PaymentStatus.PENDING, response.status());
         assertNotNull(response.createdAt());
 
         ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).saveAndFlush(saved.capture());
-        assertEquals("PENDING", saved.getValue().getStatus());
+        assertEquals(PaymentStatus.PENDING, saved.getValue().getStatus());
         assertEquals("key-1", saved.getValue().getIdempotencyKey());
         assertNotNull(saved.getValue().getIdempotencyRequestHash());
     }
@@ -236,7 +239,6 @@ class PaymentServiceImplTest {
                 "0987654321",
                 new BigDecimal("5000.00"),
                 "NGN",
-                "PENDING",
                 null,
                 null
         );
@@ -251,7 +253,7 @@ class PaymentServiceImplTest {
         // Assert
         assertEquals(42L, response.id());
         assertEquals("1234567890", response.sourceAccount());
-        assertEquals("PENDING", response.status());
+        assertEquals(PaymentStatus.PENDING, response.status());
     }
 
     @Test
@@ -275,7 +277,6 @@ class PaymentServiceImplTest {
                 "0987654321",
                 new BigDecimal("5000.00"),
                 "NGN",
-                "PENDING",
                 null,
                 null
         );
@@ -301,7 +302,7 @@ class PaymentServiceImplTest {
         assertEquals("1111111111", response.sourceAccount());
         assertEquals("2222222222", response.destinationAccount());
         assertEquals(new BigDecimal("9000.00"), response.amount());
-        assertEquals("PENDING", response.status());
+        assertEquals(PaymentStatus.PENDING, response.status());
         assertEquals(existing.getCreatedAt(), response.createdAt());
     }
 
@@ -334,7 +335,6 @@ class PaymentServiceImplTest {
                 "0987654321",
                 new BigDecimal("5000.00"),
                 "NGN",
-                "PENDING",
                 null,
                 null
         );
@@ -366,39 +366,60 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void shouldReturnAllNonDeletedPayments() {
+    void shouldReturnPageOfNonDeletedPaymentsNewestFirst() {
         // Arrange
-        Payment first = new Payment(
+        Payment newer = payment(2L);
+        Payment older = payment(1L);
+        Pageable expectedPageable = PageRequest.of(0, 2, Sort.by(Sort.Direction.DESC, "id"));
+
+        // 2 of 5 payments on the first page.
+        when(paymentRepository.findAllByDeletedFalse(expectedPageable))
+                .thenReturn(new PageImpl<>(List.of(newer, older), expectedPageable, 5));
+
+        // Act
+        PageResponse<PaymentResponse> response = paymentService.listPayments(null, 0, 2);
+
+        // Assert
+        assertEquals(List.of(2L, 1L), response.content().stream().map(PaymentResponse::id).toList());
+        assertEquals(0, response.page());
+        assertEquals(2, response.size());
+        assertEquals(5, response.totalElements());
+        assertEquals(3, response.totalPages());
+        verify(paymentRepository, never()).findAllByDeletedFalseAndStatus(any(), any());
+    }
+
+    @Test
+    void shouldFilterPaymentsByStatus() {
+        // Arrange
+        Payment pending = payment(7L);
+        Pageable expectedPageable = PageRequest.of(1, 20, Sort.by(Sort.Direction.DESC, "id"));
+        Page<Payment> page = new PageImpl<>(List.of(pending), expectedPageable, 21);
+
+        when(paymentRepository.findAllByDeletedFalseAndStatus(PaymentStatus.PENDING, expectedPageable))
+                .thenReturn(page);
+
+        // Act
+        PageResponse<PaymentResponse> response =
+                paymentService.listPayments(PaymentStatus.PENDING, 1, 20);
+
+        // Assert
+        assertEquals(1, response.content().size());
+        assertEquals(PaymentStatus.PENDING, response.content().get(0).status());
+        assertEquals(1, response.page());
+        assertEquals(21, response.totalElements());
+        verify(paymentRepository, never()).findAllByDeletedFalse(any());
+    }
+
+    private static Payment payment(Long id) {
+        Payment payment = new Payment(
                 "1234567890",
                 "0987654321",
                 new BigDecimal("5000.00"),
                 "NGN",
-                "PENDING",
                 null,
                 null
         );
-        ReflectionTestUtils.setField(first, "id", 1L);
-
-        Payment second = new Payment(
-                "1111111111",
-                "2222222222",
-                new BigDecimal("2500.00"),
-                "NGN",
-                "PENDING",
-                null,
-                null
-        );
-        ReflectionTestUtils.setField(second, "id", 2L);
-
-        when(paymentRepository.findAllByDeletedFalseOrderByIdAsc())
-                .thenReturn(List.of(first, second));
-
-        // Act
-        List<PaymentResponse> responses = paymentService.getAllPayments();
-
-        // Assert
-        assertEquals(2, responses.size());
-        assertEquals(1L, responses.get(0).id());
-        assertEquals(2L, responses.get(1).id());
+        ReflectionTestUtils.setField(payment, "id", id);
+        return payment;
     }
 }
