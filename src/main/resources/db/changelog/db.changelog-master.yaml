@@ -11,3 +11,5 @@ databaseChangeLog:
       file: db/changelog/changes/005-create-refresh-tokens-table.yaml
   - include:
       file: db/changelog/changes/006-create-roles-and-user-roles.yaml
+  - include:
+      file: db/changelog/changes/007-payment-status-and-list-index.yaml
