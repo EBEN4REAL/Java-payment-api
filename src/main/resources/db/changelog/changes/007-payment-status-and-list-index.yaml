@@ -1,0 +1,62 @@
+
+databaseChangeLog:
+  # The dev and test profiles used to create payments as DEV_PENDING / TEST_PENDING.
+  - changeSet:
+      id: 007-1-normalize-payment-status
+      author: payment-api
+      changes:
+        - sql:
+            sql: >
+              UPDATE payments
+              SET status = 'PENDING'
+              WHERE status IN ('DEV_PENDING', 'TEST_PENDING')
+      # The original profile-specific values can't be restored.
+      rollback: []
+
+  # Fails if any other status is still present, so unknown values are never silently remapped.
+  - changeSet:
+      id: 007-2-add-payment-status-check
+      author: payment-api
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE payments
+              ADD CONSTRAINT chk_payments_status
+              CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED'))
+      rollback:
+        - sql:
+            sql: ALTER TABLE payments DROP CHECK chk_payments_status
+
+  # The list endpoint sorts newest first. Each index ends in id, so MySQL reads one page
+  # in index order instead of sorting every match.
+  #
+  # Unfiltered list. Kept separate from the status index below: when both started with
+  # is_deleted, MySQL picked the status index and sorted all rows for deep pages.
+  - changeSet:
+      id: 007-3-create-payments-active-list-index
+      author: payment-api
+      changes:
+        - createIndex:
+            tableName: payments
+            indexName: idx_payments_deleted_id
+            columns:
+              - column:
+                  name: is_deleted
+              - column:
+                  name: id
+
+  # List filtered by status. Starts with status so the unfiltered list can't use it.
+  - changeSet:
+      id: 007-4-create-payments-status-list-index
+      author: payment-api
+      changes:
+        - createIndex:
+            tableName: payments
+            indexName: idx_payments_status_deleted_id
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: is_deleted
+              - column:
+                  name: id
