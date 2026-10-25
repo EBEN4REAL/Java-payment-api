@@ -1,8 +1,10 @@
 
 package com.example.payment_api.controller;
 
+import com.example.payment_api.dto.PageResponse;
 import com.example.payment_api.dto.PaymentRequest;
 import com.example.payment_api.dto.PaymentResponse;
+import com.example.payment_api.enums.PaymentStatus;
 import com.example.payment_api.service.PaymentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,7 +45,7 @@ class PaymentControllerTest {
                 "0987654321",
                 new BigDecimal("5000.00"),
                 "NGN",
-                "PENDING",
+                PaymentStatus.PENDING,
                 Instant.now()
         );
 
@@ -56,7 +58,7 @@ class PaymentControllerTest {
 
         // Assert
         assertEquals(1L, actualResponse.id());
-        assertEquals("PENDING", actualResponse.status());
+        assertEquals(PaymentStatus.PENDING, actualResponse.status());
 
         verify(paymentService).createPayment(request, "key-1");
     }
@@ -77,7 +79,7 @@ class PaymentControllerTest {
                 "2222222222",
                 new BigDecimal("9000.00"),
                 "NGN",
-                "PENDING",
+                PaymentStatus.PENDING,
                 Instant.now()
         );
 
@@ -104,7 +106,7 @@ class PaymentControllerTest {
     }
 
     @Test
-    void shouldReturnAllPayments() {
+    void shouldPassFilterAndPagingToService() {
         // Arrange
         PaymentResponse payment = new PaymentResponse(
                 1L,
@@ -112,19 +114,20 @@ class PaymentControllerTest {
                 "0987654321",
                 new BigDecimal("5000.00"),
                 "NGN",
-                "PENDING",
+                PaymentStatus.PENDING,
                 Instant.now()
         );
 
-        when(paymentService.getAllPayments())
-                .thenReturn(List.of(payment));
+        PageResponse<PaymentResponse> page = new PageResponse<>(List.of(payment), 2, 10, 21, 3);
+
+        when(paymentService.listPayments(PaymentStatus.PENDING, 2, 10))
+                .thenReturn(page);
 
         // Act
-        List<PaymentResponse> actualResponse =
-                paymentController.getAllPayments();
+        PageResponse<PaymentResponse> actualResponse =
+                paymentController.listPayments(PaymentStatus.PENDING, 2, 10);
 
         // Assert
-        assertEquals(1, actualResponse.size());
-        assertEquals(1L, actualResponse.get(0).id());
+        assertEquals(page, actualResponse);
     }
 }
