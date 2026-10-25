@@ -189,14 +189,85 @@ class PaymentApiIntegrationTest {
                         .with(asUser()))
                 .andExpect(status().isNoContent());
 
-        String keptPath = "$[?(@.id == " + keptId + ")]";
-        String deletedPath = "$[?(@.id == " + deletedId + ")]";
+        String keptPath = "$.content[?(@.id == " + keptId + ")]";
+        String deletedPath = "$.content[?(@.id == " + deletedId + ")]";
 
         mockMvc.perform(get("/api/payments")
                         .with(asUser()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(keptPath).isNotEmpty())
                 .andExpect(jsonPath(deletedPath).isEmpty());
+    }
+
+    @Test
+    void shouldPaginatePaymentsNewestFirst() throws Exception {
+        Long olderId = createPayment();
+        Long newerId = createPayment();
+
+        mockMvc.perform(get("/api/payments")
+                        .param("size", "1")
+                        .with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(newerId))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").isNumber())
+                .andExpect(jsonPath("$.totalPages").isNumber());
+
+        mockMvc.perform(get("/api/payments")
+                        .param("page", "1")
+                        .param("size", "1")
+                        .with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(olderId))
+                .andExpect(jsonPath("$.page").value(1));
+    }
+
+    @Test
+    void shouldFilterPaymentsByStatus() throws Exception {
+        Long paymentId = createPayment();
+        String paymentPath = "$.content[?(@.id == " + paymentId + ")]";
+
+        mockMvc.perform(get("/api/payments")
+                        .param("status", "PENDING")
+                        .with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(paymentPath).isNotEmpty());
+
+        mockMvc.perform(get("/api/payments")
+                        .param("status", "COMPLETED")
+                        .with(asUser()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(paymentPath).isEmpty());
+    }
+
+    @Test
+    void shouldRejectUnknownStatusFilter() throws Exception {
+        mockMvc.perform(get("/api/payments")
+                        .param("status", "UNKNOWN")
+                        .with(asUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        "Invalid value 'UNKNOWN' for status. Allowed values: PENDING, COMPLETED, FAILED"));
+    }
+
+    @Test
+    void shouldRejectPageSizeAboveMaximum() throws Exception {
+        mockMvc.perform(get("/api/payments")
+                        .param("size", "101")
+                        .with(asUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("size must be less than or equal to 100"));
+    }
+
+    @Test
+    void shouldRejectNegativePage() throws Exception {
+        mockMvc.perform(get("/api/payments")
+                        .param("page", "-1")
+                        .with(asUser()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("page must be greater than or equal to 0"));
     }
 
     @Test
