@@ -68,5 +68,20 @@
     "name": "security.refresh-cookie.same-site",
     "type": "java.lang.String",
     "description": "A description for 'security.refresh-cookie.same-site'"
+  },
+  {
+    "name": "payment.events.topic",
+    "type": "java.lang.String",
+    "description": "Topic that payment events are published to."
+  },
+  {
+    "name": "payment.events.partitions",
+    "type": "java.lang.Integer",
+    "description": "Number of partitions for the payment events topic."
+  },
+  {
+    "name": "payment.events.replication-factor",
+    "type": "java.lang.Short",
+    "description": "Replication factor for the payment events topic."
   }
 ]}
