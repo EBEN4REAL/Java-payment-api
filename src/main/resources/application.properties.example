@@ -38,3 +38,30 @@ spring.jpa.show-sql=true
 # Liquibase migrations
 spring.liquibase.enabled=true
 spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml
+
+# Kafka (local broker: docker compose up -d)
+spring.kafka.bootstrap-servers=${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+# Producer. Keys are payment IDs, so all events for one payment land on the same partition, in order.
+spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
+spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JacksonJsonSerializer
+# Wait for all in-sync replicas, and let the broker drop duplicates caused by producer retries.
+spring.kafka.producer.acks=all
+spring.kafka.producer.properties.enable.idempotence=true
+# Fail a send after 5s instead of the 60s default when the broker is unreachable.
+spring.kafka.producer.properties.max.block.ms=5000
+# The JSON body is the contract: don't send Java class names in headers.
+spring.kafka.producer.properties.spring.json.add.type.headers=false
+
+# Consumer. ErrorHandlingDeserializer stops a malformed message from failing in a loop forever.
+spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+spring.kafka.consumer.properties.spring.deserializer.value.delegate.class=org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+spring.kafka.consumer.properties.spring.json.use.type.headers=false
+# A new consumer group starts from the oldest event it hasn't seen, not only new ones.
+spring.kafka.consumer.auto-offset-reset=earliest
+
+# Payment events topic. Use a replication factor of 3 on a real cluster; local Kafka has one broker.
+payment.events.topic=payment-events
+payment.events.partitions=3
+payment.events.replication-factor=1
