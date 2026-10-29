@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +26,7 @@ import com.example.payment_api.exception.InvalidIdempotencyKeyException;
 import com.example.payment_api.exception.PaymentNotFoundException;
 import com.example.payment_api.entity.Payment;
 import com.example.payment_api.enums.PaymentStatus;
+import com.example.payment_api.event.PaymentCreatedEvent;
 import com.example.payment_api.repository.PaymentRepository;
 import com.example.payment_api.util.ConstraintViolations;
 import com.example.payment_api.util.Hashing;
@@ -33,9 +35,13 @@ import com.example.payment_api.util.Hashing;
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public PaymentServiceImpl(PaymentRepository paymentRepository) {
+    public PaymentServiceImpl(
+            PaymentRepository paymentRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.paymentRepository = paymentRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 100;
@@ -74,6 +80,9 @@ public class PaymentServiceImpl implements PaymentService {
 
         try {
             Payment savedPayment = paymentRepository.saveAndFlush(payment);
+
+            // Delivered to Kafka by PaymentEventProducer only once this transaction commits.
+            eventPublisher.publishEvent(PaymentCreatedEvent.from(savedPayment));
 
             return toResponse(savedPayment);
         } catch (DataIntegrityViolationException ex) {
