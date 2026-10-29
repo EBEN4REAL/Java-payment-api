@@ -103,6 +103,19 @@
             <artifactId>spring-boot-starter-liquibase</artifactId>
         </dependency>
 
+        <!-- Kafka: publishes and consumes payment events -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
+
+        <!-- Kafka testing support (spring-kafka-test) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
