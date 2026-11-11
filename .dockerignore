@@ -1,0 +1,15 @@
+# Keep the build context small and free of secrets.
+.git
+.github
+.vscode
+.idea
+target
+HELP.md
+k8s
+infra
+
+# Local secrets: never part of an image.
+src/main/resources/application.properties
+src/test/resources/application*.properties
+.env
+.env.*
