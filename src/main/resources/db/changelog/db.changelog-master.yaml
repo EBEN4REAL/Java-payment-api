@@ -13,3 +13,7 @@ databaseChangeLog:
       file: db/changelog/changes/006-create-roles-and-user-roles.yaml
   - include:
       file: db/changelog/changes/007-payment-status-and-list-index.yaml
+  - include:
+      file: db/changelog/changes/008-create-outbox-events.yaml
+  - include:
+      file: db/changelog/changes/009-payment-processing.yaml
