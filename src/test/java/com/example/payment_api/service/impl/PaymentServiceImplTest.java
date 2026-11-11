@@ -7,6 +7,7 @@ import com.example.payment_api.dto.PaymentResponse;
 import com.example.payment_api.entity.Payment;
 import com.example.payment_api.enums.PaymentStatus;
 import com.example.payment_api.event.PaymentCreatedEvent;
+import com.example.payment_api.messaging.OutboxService;
 import com.example.payment_api.exception.IdempotencyKeyConflictException;
 import com.example.payment_api.exception.IdempotencyKeyMismatchException;
 import com.example.payment_api.exception.InvalidIdempotencyKeyException;
@@ -20,7 +21,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.hibernate.exception.ConstraintViolationException;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -49,13 +49,13 @@ class PaymentServiceImplTest {
     private PaymentRepository paymentRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private OutboxService outboxService;
 
     private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
-        paymentService = new PaymentServiceImpl(paymentRepository, eventPublisher);
+        paymentService = new PaymentServiceImpl(paymentRepository, outboxService);
     }
 
     @Test
@@ -95,9 +95,9 @@ class PaymentServiceImplTest {
         assertEquals("key-1", saved.getValue().getIdempotencyKey());
         assertNotNull(saved.getValue().getIdempotencyRequestHash());
 
-        // One event describing the saved payment, sent to Kafka after commit.
+        // One event describing the saved payment, written to the outbox in the same transaction.
         ArgumentCaptor<PaymentCreatedEvent> event = ArgumentCaptor.forClass(PaymentCreatedEvent.class);
-        verify(eventPublisher).publishEvent(event.capture());
+        verify(outboxService).enqueue(event.capture());
         assertNotNull(event.getValue().eventId());
         assertEquals(1L, event.getValue().paymentId());
         assertEquals(new BigDecimal("5000.00"), event.getValue().amount());
@@ -128,7 +128,7 @@ class PaymentServiceImplTest {
         // Assert: same payment returned, nothing new saved, no second event.
         assertEquals(1L, response.id());
         verify(paymentRepository, times(1)).saveAndFlush(any(Payment.class));
-        verify(eventPublisher, times(1)).publishEvent(any(PaymentCreatedEvent.class));
+        verify(outboxService, times(1)).enqueue(any(PaymentCreatedEvent.class));
     }
 
     @Test
@@ -190,7 +190,7 @@ class PaymentServiceImplTest {
                 IdempotencyKeyConflictException.class,
                 () -> paymentService.createPayment(request, "key-1")
         );
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(outboxService, never()).enqueue(any());
     }
 
     @Test
