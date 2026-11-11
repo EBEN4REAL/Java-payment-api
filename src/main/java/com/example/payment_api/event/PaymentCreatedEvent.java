@@ -8,11 +8,10 @@ import com.example.payment_api.entity.Payment;
 import com.example.payment_api.enums.PaymentStatus;
 
 /**
- * Published to the payment events topic after a payment is saved.
+ * A payment was created and is waiting to be processed.
  *
  * <p>This is a contract with other services: add fields freely, but don't rename or
- * remove them without versioning the event. Kafka can deliver an event more than once,
- * so consumers should use {@code eventId} to ignore duplicates.
+ * remove them without versioning the event.
  */
 public record PaymentCreatedEvent(
         UUID eventId,
@@ -23,7 +22,9 @@ public record PaymentCreatedEvent(
         BigDecimal amount,
         String currency,
         PaymentStatus status
-) {
+) implements PaymentEvent {
+
+    public static final String TYPE = "PaymentCreated";
 
     public static PaymentCreatedEvent from(Payment payment) {
         return new PaymentCreatedEvent(
@@ -36,5 +37,10 @@ public record PaymentCreatedEvent(
                 payment.getCurrency(),
                 payment.getStatus()
         );
+    }
+
+    @Override
+    public String eventType() {
+        return TYPE;
     }
 }
