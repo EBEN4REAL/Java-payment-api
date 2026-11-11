@@ -1,0 +1,37 @@
+# The payment API on the local kind cluster. Deploy with ../deploy.sh.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: payment-api
+
+resources:
+  - ../../base
+
+# Built locally and loaded into kind (kind load docker-image), never pulled.
+images:
+  - name: payment-api
+    newName: payment-api
+    newTag: local
+
+configMapGenerator:
+  - name: payment-api-config
+    behavior: merge
+    literals:
+      # Services from ../infra, in the same namespace.
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/payment_db
+      - SPRING_DATA_REDIS_HOST=redis
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - BANK_BASE_URL=http://bank:8080
+      # The local Kafka has a single broker.
+      - PAYMENT_EVENTS_REPLICATIONFACTOR=1
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0
+
+patches:
+  # Images loaded into kind must not be pulled.
+  - target:
+      kind: Deployment
+      name: payment-api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
