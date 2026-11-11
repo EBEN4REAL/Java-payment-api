@@ -42,26 +42,92 @@ spring.liquibase.change-log=classpath:db/changelog/db.changelog-master.yaml
 # Kafka (local broker: docker compose up -d)
 spring.kafka.bootstrap-servers=${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
-# Producer. Keys are payment IDs, so all events for one payment land on the same partition, in order.
+# Producer, used by OutboxRelay. Events are stored as JSON in the outbox, so they're sent as strings.
+# Keys are payment IDs, so all events for one payment land on the same partition, in order.
 spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer
-spring.kafka.producer.value-serializer=org.springframework.kafka.support.serializer.JacksonJsonSerializer
+spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer
 # Wait for all in-sync replicas, and let the broker drop duplicates caused by producer retries.
 spring.kafka.producer.acks=all
 spring.kafka.producer.properties.enable.idempotence=true
-# Fail a send after 5s instead of the 60s default when the broker is unreachable.
+# Fail fast when the broker is unreachable; the outbox keeps the event and retries later.
 spring.kafka.producer.properties.max.block.ms=5000
-# The JSON body is the contract: don't send Java class names in headers.
-spring.kafka.producer.properties.spring.json.add.type.headers=false
+spring.kafka.producer.properties.request.timeout.ms=10000
+spring.kafka.producer.properties.delivery.timeout.ms=30000
 
-# Consumer. ErrorHandlingDeserializer stops a malformed message from failing in a loop forever.
+# Consumer. Payloads are read as strings and parsed by the listener, based on the eventType header.
 spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
-spring.kafka.consumer.value-deserializer=org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
-spring.kafka.consumer.properties.spring.deserializer.value.delegate.class=org.springframework.kafka.support.serializer.JacksonJsonDeserializer
-spring.kafka.consumer.properties.spring.json.use.type.headers=false
+spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer
 # A new consumer group starts from the oldest event it hasn't seen, not only new ones.
 spring.kafka.consumer.auto-offset-reset=earliest
 
 # Payment events topic. Use a replication factor of 3 on a real cluster; local Kafka has one broker.
 payment.events.topic=payment-events
+payment.events.dead-letter-topic=payment-events-dlt
 payment.events.partitions=3
 payment.events.replication-factor=1
+
+# Transactional outbox (OutboxRelay, OutboxCleanup)
+payment.outbox.poll-interval=500ms
+payment.outbox.batch-size=100
+payment.outbox.send-timeout=35s
+payment.outbox.retention=7d
+payment.outbox.cleanup-cron=0 15 * * * *
+# Relay and cleanup run on the scheduler; give them separate threads.
+spring.task.scheduling.pool.size=2
+
+# Payment processor (Kafka consumer that sends payments to the bank)
+payment.processing.enabled=true
+# Transient failures: 1s, 2s, 4s, 8s, 16s, 30s, then the dead-letter topic (about 1 minute in total).
+payment.processing.retry.initial-interval=1s
+payment.processing.retry.multiplier=2
+payment.processing.retry.max-interval=30s
+payment.processing.retry.max-retries=6
+payment.processing.retry.circuit-open-interval=5s
+
+# Bank API (local: the WireMock stub in compose.yaml)
+bank.base-url=${BANK_BASE_URL:http://localhost:8089}
+bank.connect-timeout=2s
+bank.read-timeout=5s
+
+# Bank circuit breaker: opens when half of the last 20 calls failed or were slow
+# (at least 10 calls), stays open for 30s, then lets 3 trial calls through.
+resilience4j.circuitbreaker.instances.bank.sliding-window-type=COUNT_BASED
+resilience4j.circuitbreaker.instances.bank.sliding-window-size=20
+resilience4j.circuitbreaker.instances.bank.minimum-number-of-calls=10
+resilience4j.circuitbreaker.instances.bank.failure-rate-threshold=50
+resilience4j.circuitbreaker.instances.bank.slow-call-duration-threshold=3s
+resilience4j.circuitbreaker.instances.bank.slow-call-rate-threshold=80
+resilience4j.circuitbreaker.instances.bank.wait-duration-in-open-state=30s
+resilience4j.circuitbreaker.instances.bank.permitted-number-of-calls-in-half-open-state=3
+resilience4j.circuitbreaker.instances.bank.automatic-transition-from-open-to-half-open-enabled=true
+# Only outages count as failures. A rejected request is our bug, not a sign the bank is down.
+resilience4j.circuitbreaker.instances.bank.record-exceptions=com.example.payment_api.client.BankUnavailableException
+resilience4j.circuitbreaker.instances.bank.ignore-exceptions=com.example.payment_api.client.BankRequestRejectedException
+
+# Observability
+# Actuator on its own port: for Kubernetes probes and metrics scrapers, never exposed publicly.
+management.server.port=8081
+management.endpoints.web.exposure.include=health,info,prometheus
+management.endpoint.health.probes.enabled=true
+management.endpoint.health.show-components=always
+# Liveness checks only the app itself, so a database outage doesn't get every pod restarted.
+# Readiness also needs the database and Redis: without them requests would fail.
+management.endpoint.health.group.readiness.include=readinessState,db,redis
+management.info.build.enabled=true
+management.metrics.tags.application=${spring.application.name}
+# Bank circuit breaker shows on /actuator/health, but an open breaker doesn't mark the app unhealthy.
+resilience4j.circuitbreaker.instances.bank.register-health-indicator=true
+resilience4j.circuitbreaker.instances.bank.allow-health-indicator-to-fail=false
+# Trace Kafka sends and receives, so one trace follows a payment through the topic.
+spring.kafka.template.observation-enabled=true
+spring.kafka.listener.observation-enabled=true
+# Trace every request locally. Lower this in production (e.g. 0.1) to limit volume.
+management.tracing.sampling.probability=1.0
+# OTLP export of traces and metrics (local: docker compose --profile observability up -d).
+# Off by default so the app doesn't log export errors when no collector is running.
+management.tracing.export.otlp.enabled=${OTLP_EXPORT_ENABLED:false}
+management.opentelemetry.tracing.export.otlp.endpoint=${OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+management.otlp.metrics.export.enabled=${OTLP_EXPORT_ENABLED:false}
+management.otlp.metrics.export.url=${OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+management.otlp.metrics.export.step=30s
+management.logging.export.otlp.enabled=false
