@@ -13,5 +13,9 @@ public record PaymentResponse(
         BigDecimal amount,
         String currency,
         PaymentStatus status,
-        Instant createdAt
+        Instant createdAt,
+        // Set once the bank accepts the transfer.
+        String bankReference,
+        // Set if the bank declines the transfer.
+        String failureReason
 ) {}
