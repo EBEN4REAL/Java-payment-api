@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -73,6 +74,28 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT,
                 ex.getMessage()
+        );
+    }
+
+    // E.g. editing a payment that is already being processed.
+    @ExceptionHandler(IllegalPaymentStateException.class)
+    public ProblemDetail handleIllegalPaymentState(
+            IllegalPaymentStateException ex) {
+
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                ex.getMessage()
+        );
+    }
+
+    // Two changes to the same payment at once, e.g. an edit while the processor claims it.
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleConcurrentModification(
+            ObjectOptimisticLockingFailureException ex) {
+
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                "The payment was changed by another request. Reload it and try again."
         );
     }
 
