@@ -9,6 +9,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.example.payment_api.enums.PaymentStatus;
+import com.example.payment_api.exception.IllegalPaymentStateException;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,6 +19,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 @Entity
 @Table(name = "payments")
@@ -56,6 +58,17 @@ public class Payment {
     @Column(name = "idempotency_request_hash", length = 64, updatable = false)
     private String idempotencyRequestHash;
 
+    // Optimistic locking: an edit and the processor can't silently overwrite each other.
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
+    @Column(name = "bank_reference", length = 100)
+    private String bankReference;
+
+    @Column(name = "failure_reason", length = 255)
+    private String failureReason;
+
     protected Payment() {}
 
     public Payment(
@@ -81,6 +94,7 @@ public class Payment {
             String destinationAccount,
             BigDecimal amount,
             String currency) {
+        requireStatus(PaymentStatus.PENDING, "update");
         this.sourceAccount = sourceAccount;
         this.destinationAccount = destinationAccount;
         this.amount = amount;
@@ -88,7 +102,32 @@ public class Payment {
     }
 
     public void markDeleted() {
+        requireStatus(PaymentStatus.PENDING, "delete");
         this.deleted = true;
+    }
+
+    // Claimed by the processor; from here on the payment can't be edited or deleted.
+    public void markProcessing() {
+        requireStatus(PaymentStatus.PENDING, "start processing");
+        this.status = PaymentStatus.PROCESSING;
+    }
+
+    public void markCompleted(String bankReference) {
+        requireStatus(PaymentStatus.PROCESSING, "complete");
+        this.status = PaymentStatus.COMPLETED;
+        this.bankReference = bankReference;
+    }
+
+    public void markFailed(String failureReason) {
+        requireStatus(PaymentStatus.PROCESSING, "fail");
+        this.status = PaymentStatus.FAILED;
+        this.failureReason = failureReason;
+    }
+
+    private void requireStatus(PaymentStatus required, String action) {
+        if (status != required) {
+            throw new IllegalPaymentStateException(id, status, action);
+        }
     }
 
     public boolean isDeleted() {
@@ -129,5 +168,13 @@ public class Payment {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getBankReference() {
+        return bankReference;
+    }
+
+    public String getFailureReason() {
+        return failureReason;
     }
 }
