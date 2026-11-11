@@ -1,0 +1,12 @@
+# The API only. The management port (8081) is reached by probes and scrapers on the pod
+# directly and is deliberately not part of this Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
