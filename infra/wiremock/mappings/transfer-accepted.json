@@ -1,0 +1,14 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "url": "/v1/transfers",
+    "headers": { "Idempotency-Key": { "matches": "payment-[0-9]+" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "status": "ACCEPTED", "transferId": "TRF-{{randomValue length=12 type='ALPHANUMERIC' uppercase=true}}" },
+    "fixedDelayMilliseconds": 50
+  }
+}
