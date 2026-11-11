@@ -3,6 +3,7 @@ package com.example.payment_api.config;
 
 import java.time.Duration;
 
+import org.springframework.boot.cache.autoconfigure.RedisCacheManagerBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -20,5 +21,11 @@ public class RedisCacheConfig {
                         RedisSerializationContext.SerializationPair
                                 .fromSerializer(RedisSerializer.json())
                 );
+    }
+
+    ///This bean makes the Redis cache wait for the database transaction to commit before changing anything.
+    @Bean
+    public RedisCacheManagerBuilderCustomizer transactionAwareCacheManager() {
+        return builder -> builder.transactionAware();
     }
 }
