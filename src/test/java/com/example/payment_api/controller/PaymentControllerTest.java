@@ -46,7 +46,9 @@ class PaymentControllerTest {
                 new BigDecimal("5000.00"),
                 "NGN",
                 PaymentStatus.PENDING,
-                Instant.now()
+                Instant.now(),
+                null,
+                null
         );
 
         when(paymentService.createPayment(request, "key-1"))
@@ -80,7 +82,9 @@ class PaymentControllerTest {
                 new BigDecimal("9000.00"),
                 "NGN",
                 PaymentStatus.PENDING,
-                Instant.now()
+                Instant.now(),
+                null,
+                null
         );
 
         when(paymentService.updatePayment(1L, request))
@@ -115,7 +119,9 @@ class PaymentControllerTest {
                 new BigDecimal("5000.00"),
                 "NGN",
                 PaymentStatus.PENDING,
-                Instant.now()
+                Instant.now(),
+                null,
+                null
         );
 
         PageResponse<PaymentResponse> page = new PageResponse<>(List.of(payment), 2, 10, 21, 3);
