@@ -1,0 +1,17 @@
+# DEVELOPMENT ONLY: single-instance MySQL, Redis, Kafka and the simulated bank, so the app
+# has something to talk to on a local cluster. In production use managed or properly
+# replicated services and point the app at them through its ConfigMap and Secret.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: payment-api
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: payment-system-dev-infra
+
+resources:
+  - mysql.yaml
+  - redis.yaml
+  - kafka.yaml
+  - bank.yaml
