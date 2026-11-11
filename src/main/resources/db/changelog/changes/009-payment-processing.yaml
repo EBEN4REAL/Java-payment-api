@@ -1,0 +1,45 @@
+databaseChangeLog:
+  # PROCESSING marks a payment the processor has claimed and is sending to the bank.
+  # Payments can only be edited or deleted while PENDING.
+  - changeSet:
+      id: 009-1-allow-processing-status
+      author: payment-api
+      changes:
+        - sql:
+            sql: ALTER TABLE payments DROP CHECK chk_payments_status
+        - sql:
+            sql: >
+              ALTER TABLE payments
+              ADD CONSTRAINT chk_payments_status
+              CHECK (status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'))
+      rollback:
+        - sql:
+            sql: ALTER TABLE payments DROP CHECK chk_payments_status
+        - sql:
+            sql: >
+              ALTER TABLE payments
+              ADD CONSTRAINT chk_payments_status
+              CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED'))
+
+  - changeSet:
+      id: 009-2-add-payment-processing-columns
+      author: payment-api
+      changes:
+        - addColumn:
+            tableName: payments
+            columns:
+              # Optimistic locking: stops an edit and the processor overwriting each other.
+              - column:
+                  name: version
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              # The bank's transfer ID, set when the payment completes.
+              - column:
+                  name: bank_reference
+                  type: VARCHAR(100)
+              # Why the bank declined the payment, set when it fails.
+              - column:
+                  name: failure_reason
+                  type: VARCHAR(255)
