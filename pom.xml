@@ -20,6 +20,7 @@
 
     <properties>
         <java.version>25</java.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
     </properties>
 
     <dependencies>
@@ -109,6 +110,37 @@
             <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
+        <!-- HTTP client (RestClient) for calling the bank -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+
+        <!-- Circuit breaker around the bank call -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot4</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+
+        <!-- Health checks and metrics endpoints (/actuator/health, /actuator/prometheus) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Metrics in Prometheus format, for scraping (e.g. in Kubernetes) -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Distributed tracing and OTLP export of traces and metrics -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-opentelemetry</artifactId>
+        </dependency>
+
         <!-- Kafka testing support (spring-kafka-test) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -123,6 +155,18 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <!-- Version and build time for /actuator/info -->
+                    <execution>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Builds are reproducible (fixed timestamps), so a build time would be wrong. -->
+                            <time>off</time>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
