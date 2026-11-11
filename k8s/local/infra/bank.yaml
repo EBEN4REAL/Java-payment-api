@@ -1,0 +1,54 @@
+# Simulated bank. The bank-mappings ConfigMap is created by deploy.sh from infra/wiremock/mappings,
+# so Compose and Kubernetes use the same rules.
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank
+spec:
+  selector:
+    app: bank
+  ports:
+    - name: http
+      port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bank
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bank
+  template:
+    metadata:
+      labels:
+        app: bank
+    spec:
+      enableServiceLinks: false
+      containers:
+        - name: bank
+          image: wiremock/wiremock:3.13.2
+          args: ["--global-response-templating", "--disable-banner"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /__admin/health
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: mappings
+              mountPath: /home/wiremock/mappings
+              readOnly: true
+      volumes:
+        - name: mappings
+          configMap:
+            name: bank-mappings
