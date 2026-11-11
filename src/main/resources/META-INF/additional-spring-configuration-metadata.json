@@ -83,5 +83,80 @@
     "name": "payment.events.replication-factor",
     "type": "java.lang.Short",
     "description": "Replication factor for the payment events topic."
+  },
+  {
+    "name": "payment.events.dead-letter-topic",
+    "type": "java.lang.String",
+    "description": "Topic that events go to when processing fails for good."
+  },
+  {
+    "name": "payment.outbox.poll-interval",
+    "type": "java.time.Duration",
+    "description": "How long the outbox relay waits between polls once it has caught up."
+  },
+  {
+    "name": "payment.outbox.batch-size",
+    "type": "java.lang.Integer",
+    "description": "Maximum outbox events published per relay transaction."
+  },
+  {
+    "name": "payment.outbox.send-timeout",
+    "type": "java.time.Duration",
+    "description": "Upper bound on waiting for Kafka to acknowledge one outbox batch."
+  },
+  {
+    "name": "payment.outbox.retention",
+    "type": "java.time.Duration",
+    "description": "How long published outbox events are kept before cleanup deletes them."
+  },
+  {
+    "name": "payment.outbox.cleanup-cron",
+    "type": "java.lang.String",
+    "description": "When the outbox cleanup job runs (Spring cron expression)."
+  },
+  {
+    "name": "payment.processing.enabled",
+    "type": "java.lang.Boolean",
+    "description": "Starts the payment processor Kafka consumer."
+  },
+  {
+    "name": "payment.processing.retry.initial-interval",
+    "type": "java.time.Duration",
+    "description": "First retry delay for transient processing failures."
+  },
+  {
+    "name": "payment.processing.retry.multiplier",
+    "type": "java.lang.Double",
+    "description": "Factor the retry delay grows by after each attempt."
+  },
+  {
+    "name": "payment.processing.retry.max-interval",
+    "type": "java.time.Duration",
+    "description": "Longest delay between retries."
+  },
+  {
+    "name": "payment.processing.retry.max-retries",
+    "type": "java.lang.Integer",
+    "description": "Retries before an event is sent to the dead-letter topic."
+  },
+  {
+    "name": "payment.processing.retry.circuit-open-interval",
+    "type": "java.time.Duration",
+    "description": "Retry delay while the bank circuit breaker is open (retried without limit)."
+  },
+  {
+    "name": "bank.base-url",
+    "type": "java.lang.String",
+    "description": "Base URL of the bank's transfer API."
+  },
+  {
+    "name": "bank.connect-timeout",
+    "type": "java.time.Duration",
+    "description": "Timeout for connecting to the bank."
+  },
+  {
+    "name": "bank.read-timeout",
+    "type": "java.time.Duration",
+    "description": "Timeout for the bank to answer a transfer request."
   }
 ]}
