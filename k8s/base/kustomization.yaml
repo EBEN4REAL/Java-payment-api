@@ -1,0 +1,28 @@
+# The payment API, independent of environment. Overlays (e.g. ../local/app) set the namespace,
+# image, infrastructure addresses and secrets.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: payment-api
+      app.kubernetes.io/part-of: payment-system
+    includeSelectors: true
+
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - poddisruptionbudget.yaml
+
+# Non-secret settings, as environment variables (Spring maps PAYMENT_EVENTS_PARTITIONS to
+# payment.events.partitions). The name gets a content hash, so changing a value rolls the pods.
+configMapGenerator:
+  - name: payment-api-config
+    literals:
+      - LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs
+      - SPRING_JPA_SHOWSQL=false
+      # Three copies of every partition on a real Kafka cluster.
+      - PAYMENT_EVENTS_REPLICATIONFACTOR=3
+      - MANAGEMENT_TRACING_SAMPLING_PROBABILITY=0.1
+      - OTLP_EXPORT_ENABLED=false
