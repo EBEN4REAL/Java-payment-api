@@ -8,7 +8,6 @@ import java.util.Optional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +26,7 @@ import com.example.payment_api.exception.PaymentNotFoundException;
 import com.example.payment_api.entity.Payment;
 import com.example.payment_api.enums.PaymentStatus;
 import com.example.payment_api.event.PaymentCreatedEvent;
+import com.example.payment_api.messaging.OutboxService;
 import com.example.payment_api.repository.PaymentRepository;
 import com.example.payment_api.util.ConstraintViolations;
 import com.example.payment_api.util.Hashing;
@@ -35,13 +35,13 @@ import com.example.payment_api.util.Hashing;
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OutboxService outboxService;
 
     public PaymentServiceImpl(
             PaymentRepository paymentRepository,
-            ApplicationEventPublisher eventPublisher) {
+            OutboxService outboxService) {
         this.paymentRepository = paymentRepository;
-        this.eventPublisher = eventPublisher;
+        this.outboxService = outboxService;
     }
 
     private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 100;
@@ -81,8 +81,8 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             Payment savedPayment = paymentRepository.saveAndFlush(payment);
 
-            // Delivered to Kafka by PaymentEventProducer only once this transaction commits.
-            eventPublisher.publishEvent(PaymentCreatedEvent.from(savedPayment));
+            // Same transaction as the payment: the event exists if and only if the payment does.
+            outboxService.enqueue(PaymentCreatedEvent.from(savedPayment));
 
             return toResponse(savedPayment);
         } catch (DataIntegrityViolationException ex) {
@@ -180,7 +180,9 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getAmount(),
                 payment.getCurrency(),
                 payment.getStatus(),
-                payment.getCreatedAt()
+                payment.getCreatedAt(),
+                payment.getBankReference(),
+                payment.getFailureReason()
         );
     }
 }
