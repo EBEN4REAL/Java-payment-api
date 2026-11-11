@@ -1,8 +1,47 @@
 # Local infrastructure for development: docker compose up -d
+# All services restart with Docker, so a Docker Desktop restart doesn't leave them stopped.
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: payment-api-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: payment_db
+      # The app connects as this user, which owns payment_db only. Root is for admin tasks.
+      MYSQL_USER: ${DB_USERNAME:-payment_api}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-devpassword}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-devrootpassword}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # 127.0.0.1, not localhost: localhost uses the Unix socket, which also answers while the
+      # image is still initialising the database with networking off. TCP only answers once
+      # the real server is up. $$ defers expansion to the container's shell.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Cache only: nothing in Redis needs to survive a restart, so no volume.
+  redis:
+    image: redis:7
+    container_name: payment-api-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   kafka:
     image: apache/kafka:4.3.0
     container_name: payment-api-kafka
+    restart: unless-stopped
     ports:
       - "9092:9092"
     environment:
@@ -36,5 +75,72 @@ services:
       retries: 10
       start_period: 20s
 
+  # Simulated bank transfer API. Rules are in infra/wiremock (see its README).
+  bank:
+    image: wiremock/wiremock:3.13.2
+    container_name: payment-api-bank
+    restart: unless-stopped
+    ports:
+      - "8089:8080"
+    volumes:
+      - ./infra/wiremock/mappings:/home/wiremock/mappings:ro
+    command: ["--global-response-templating", "--disable-banner"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/__admin/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # The API itself, as a container: docker compose --profile app up -d --build
+  # Needs JWT_SECRET, e.g. in a .env file next to this one (gitignored):
+  #   JWT_SECRET=<output of: openssl rand -base64 48>
+  app:
+    profiles: ["app"]
+    build: .
+    image: payment-api:local
+    container_name: payment-api-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      bank:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+      # Actuator: reachable from this machine only.
+      - "127.0.0.1:8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/payment_db
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-payment_api}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-devpassword}
+      # No default on purpose: the app refuses to start without it.
+      SECURITY_JWT_SECRET: ${JWT_SECRET:-}
+      SPRING_DATA_REDIS_HOST: redis
+      KAFKA_BOOTSTRAP_SERVERS: kafka:19092
+      BANK_BASE_URL: http://bank:8080
+      OTLP_ENDPOINT: http://lgtm:4318
+      OTLP_EXPORT_ENABLED: ${OTLP_EXPORT_ENABLED:-false}
+      # JSON logs (Elastic Common Schema), with trace and span IDs, for log collectors.
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      SPRING_JPA_SHOWSQL: "false"
+
+  # Traces, metrics and dashboards: docker compose --profile observability up -d
+  # Grafana: http://localhost:3000 (admin/admin). Run the app with OTLP_EXPORT_ENABLED=true.
+  lgtm:
+    profiles: ["observability"]
+    image: grafana/otel-lgtm:0.13.0
+    container_name: payment-api-lgtm
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"
+
 volumes:
+  mysql-data:
   kafka-data:
