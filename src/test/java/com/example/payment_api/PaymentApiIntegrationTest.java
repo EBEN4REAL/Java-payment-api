@@ -249,7 +249,7 @@ class PaymentApiIntegrationTest {
                         .with(asUser()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(
-                        "Invalid value 'UNKNOWN' for status. Allowed values: PENDING, COMPLETED, FAILED"));
+                        "Invalid value 'UNKNOWN' for status. Allowed values: PENDING, PROCESSING, COMPLETED, FAILED"));
     }
 
     @Test
